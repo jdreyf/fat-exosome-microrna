@@ -1,0 +1,346 @@
+---
+title: "reproduce-fat-exosome-microrna"
+author: "jonathan dreyfuss"
+date: "`r Sys.time()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library("gplots")
+source("functions/thomou-config.r")
+```
+
+##Purpose
+To reproduce qPCR analyses, including statements in text and output, from Thomou et al. article.
+
+##Adipose Tissue is a Major Source of Circulating Exosomal miRNAs
+```{r read-wtvsko, echo=FALSE}
+#######################################################################################################################
+##mouse WT vs KO
+#######################################################################################################################
+wtvsko.ct <- read.csv("Ct_tables/ADicerKO-6mo-Ct.csv", row.names=1)
+
+wtvsko.lst <- analyze_thomou_qPCR(wtvsko.ct)
+wtvsko.pheno <- wtvsko.lst$pheno; wtvsko <- wtvsko.lst$toptab
+wtvsko.ndct <- wtvsko.lst$ndct; wtvsko.ndct.filt <- wtvsko.lst$ndct.filt
+```
+
+Compared to control, ADicerKO mice exhibited significant alterations in 422 circulating miRNAs. Of these, only 3 miRNAs had a significant increase, while 419 had significant decreases (Figures 1c-d, S1d and Supplemental Table 1) with 88% reduced by >4-fold and 13% reduced by >32-fold
+```{r}
+x <- sum(wtvsko$WTvsKO.p<0.05)
+if (x==422) cat(":-)") else cat(x)
+x <- sum(wtvsko$WTvsKO.p<0.05 & wtvsko$WTvsKO.logFC<0)
+if (x==3) cat(":-)") else cat(x)
+x <- sum(wtvsko$WTvsKO.p<0.05 & wtvsko$WTvsKO.logFC>0)
+if (x==419) cat(":-)") else cat(x)
+x <- round(sum(wtvsko$WTvsKO.p<0.05 & wtvsko$WTvsKO.FC>4)/419, 2)
+if (x==0.88) cat(":-)") else cat(x)
+x <- round(sum(wtvsko$WTvsKO.p<0.05 & wtvsko$WTvsKO.FC>32)/419, 2)
+if (x==0.13) cat(":-)") else cat(x)
+```
+
+write supp table 1  
+```{r st1}
+st.cols <- c("p", "FDR", "logFC", "FC")
+write.csv(wtvsko[,paste0("WTvsKO.", st.cols)], "Supplemental_tables/ST1_ADicerKO-6mo-stats.csv")
+```
+
+Heatmap Fig 1c  
+```{r fig1c}
+heatmap(t(wtvsko.ndct.filt), col=greenred(50), scale="column", Rowv=NA, Colv=NA)
+
+wtvsko.ndct.filt.sc <- scale(x=t(wtvsko.ndct.filt))
+write.csv(t(wtvsko.ndct.filt.sc), "heatmap_z-scores/WTvsKO_ndct_filt_z.csv")
+```
+
+PCA in S1d  
+```{r s1d}
+#pca in fig s1d
+s1d <- multi.pca(wtvsko.ndct, wtvsko.pheno, color='grp', shape='grp', name=NA, all.size=3, rm.leg.title=TRUE)
+```
+
+Indeed, in sample of 80 miRNAs of which 79 were detected there was a 50-75% reduction in total serum miRNAs in ADicerKO serum when compared to total serum of WT mice (Extended Data Figure 2a)  
+```{r s1e, echo=FALSE}
+#######################################################################################################################
+##serum
+#######################################################################################################################
+serum.ct <- read.csv("Ct_tables/WTvsKOserum-exo-ct.csv", row.names = 1)
+serum.lst <- analyze_thomou_qPCR(serum.ct, contrasts.v = c(KOvsWTinSer="SerKO-SerWT", KOvsWTinExo="ExoKO-ExoWT"))
+serum.ndct <- serum.lst$ndct; serum.ndct.filt <- serum.lst$ndct.filt
+serum.toptab <- serum.lst$toptab
+
+x <- nrow(serum.ndct)
+if (x==80) cat(":-)") else cat(x)
+x <- nrow(serum.ndct.filt)
+if (x==79) cat(":-)") else cat(x)
+all(serum.toptab$KOvsWTinSer.logFC>0)
+
+heatmap(t(serum.ndct.filt), Rowv=NA, Colv=NA, col=greenred(50))
+serum.ndct.filt <- scale(x=t(serum.ndct.filt))
+write.csv(t(serum.ndct.filt), "heatmap_z-scores/serum_ndct_z.csv")
+```
+
+Thus, brown preadipocytes isolated from Dicer-floxed animals and recombined by transduction with Ad-Cre exhibited marked reductions of at least 2 fold difference in 380 miRNAs profiled of which 359 were detectable in 91% of the exosomal miRNAs released in culture supernatants when compared to control Ad-GFP transduced cells (Extended Data Figure 2b).
+```{r s2b}
+#######################################################################################################################
+##BAT preads
+#######################################################################################################################
+bat.pread.ct <- read.csv("Ct_tables/bat-pread-Ct.csv", row.names = 1)
+bat.pread.lst <- analyze_thomou_qPCR(bat.pread.ct, contrasts.v = c(GFPvsCRE="GFP-CRE"))
+bat.pread.ndct.filt <- bat.pread.lst$ndct.filt
+
+heatmap(t(bat.pread.ndct.filt), Rowv=NA, Colv=NA, col=greenred(50))
+bat.pread.ndct.filt <- scale(x=t(bat.pread.ndct.filt))
+write.csv(t(bat.pread.ndct.filt), "heatmap_z-scores/bat_pread_ndct_z.csv")
+```
+
+
+```{r read-human, echo=FALSE, include=FALSE}
+#######################################################################################################################
+##human
+#######################################################################################################################
+human.ct <- read.csv("Ct_tables/human-Ct.csv", row.names=1)
+colnames(human.ct) <- gsub("PT", "CGL", colnames(human.ct))
+human.lst <- analyze_thomou_qPCR(human.ct, filt.thresh=NA, norm.nm="Human U6 snRNA", contrasts.v = c(CGLvsCon="CGL-control", HIVvsCon="HIV-control"))
+human.ndct <- human.lst$ndct
+human.pheno <- human.lst$pheno
+human.stats <- human.lst$toptab
+```
+
+Genome-wide qPCR profiling of 572 miRNAs in human sera revealed 119 significantly different between control and HIV lipodystrophy subjects and 213 significantly different between control and CGL subjects (Figures 1e-f, Extended Data Figure 3b, Supplemental Tables 2 and 3).  
+```{r}
+x <- nrow(human.ndct); if (x==572) cat(":-)") else cat(x)
+x <- sum(human.stats$HIVvsCon.p<0.05); if (x==119) cat(":-)") else cat(x)
+x <- sum(human.stats$CGLvsCon.p<=0.05); if (x==213) cat(":-)") else cat(x)
+```
+
+heatmap 1e  
+```{r 1e, echo=FALSE}
+heatmap(t(human.ndct), Rowv=NA, Colv=NA, scale="column", col=greenred(50))
+
+human.ndct.sc <- scale(x=t(human.ndct))
+write.csv(t(human.ndct.sc), "heatmap_z-scores/human_ndct_z.csv")
+```
+
+PCA S3b  
+```{r s3b}
+s1i <- multi.pca(human.ndct, human.pheno, color='grp', shape='grp', name=NA, all.size=3, rm.leg.title=TRUE)
+```
+
+write supp tables 2 & 3  
+```{r st2-3}
+st2 <- human.stats[,paste0("HIVvsCon.", st.cols)]
+write.csv(st2[order(st2$HIVvsCon.p),], "Supplemental_tables/ST2_HIVvsCon-stats.csv")
+
+st3 <- human.stats[,paste0("CGLvsCon.", st.cols)]
+write.csv(st3[order(st3$CGLvsCon.p),], "Supplemental_tables/ST3_CGLvsCon-stats.csv")
+```
+
+Of these, only 5% (29 miRNAs) were upregulated in either HIV or CGL patients, while 217 (38%) were robustly decreased in either CGL or HIV lipodystrophy, and 75 were decreased in both lipodystrophy groups (Figure 1g, Supplemental Table 4)   
+```{r st4}
+#create venn table, where value is sign of lfc if p<0.05, else value is 0 indicating not significant (ns)
+venn.tab <- sign(human.stats[,grep("\\.logFC", colnames(human.stats))])
+ns.ind <- which(human.stats[,grep("\\.p", colnames(human.stats))] > 0.05, arr.ind=TRUE)
+venn.tab[ns.ind] <- 0
+colnames(venn.tab) <- gsub("\\.logFC", "", colnames(venn.tab))
+#remove rows where mir never significant to subset venn
+venn.ss <- venn.tab[rowSums(abs(venn.tab))>=1,]
+
+x <- sum(rowSums(venn.ss>0)>=1); if (x==29) cat(":-)") else cat(x)
+x <- sum(rowSums(venn.ss<0)>=1); if (x==217) cat(":-)") else cat(x)
+x <- sum(rowSums(venn.ss<0)==2); if (x==75) cat(":-)") else cat(x)
+
+#match to fig 1g
+vc <- vennCounts(venn.ss>0) #up
+if (all(vc[-1, 3]==c(5, 13, 11))) cat(":-)") else cat(vc)
+vc <- vennCounts(venn.ss<0) #down
+if (all(vc[-1, 3]==c(28, 114, 75))) cat(":-)") else cat(vc)
+
+#create table for venn, which is sorted for excel
+st4 <- venn.ss[order(-rowSums(abs(venn.ss)), -2*venn.ss[,1]-venn.ss[,2]),]
+write.csv(st4, "Supplemental_tables/ST4_HumanVenn.csv")
+```
+
+Thirty of the miRNAs that were decreased in serum of both patient cohorts were also decreased in the serum of the ADicerKO mice (Supplemental Table 5).  
+```{r homo}
+hsa.both.nms <- rownames(venn.ss)[rowSums(venn.ss==-1)==2]
+mmu.nms <- rownames(wtvsko)[wtvsko$WTvsKO.p<0.05 & wtvsko$WTvsKO.logFC>0]
+int.nms <- intersect(mmu.nms, sub("hsa", "mmu", hsa.both.nms))
+if (length(int.nms)==30) cat(":-)") else cat(length(int.nms))
+
+st5 <- data.frame(HomologDownMirs=gsub("mmu-", "", int.nms))
+
+write.csv(st5, "Supplemental_tables/ST5_HomologDownMirs.csv", row.names = FALSE)
+```
+
+```{r wk4}
+#######################################################################################################################
+##4 week old mice
+#######################################################################################################################
+wk4.ct <- read.csv("Ct_tables/ADicerKO-4wk-Ct.csv", row.names=1)
+wk4.lst <- analyze_thomou_qPCR(wk4.ct, norm.nm = "Mouse U6 snRNA", contrasts.v = c(YDvsWT="YD-WT"))
+wk4.ndct.filt <- wk4.lst$ndct.filt
+wk4.tt <- wk4.lst$toptab
+```
+
+miRNA profiling of circulating exosomes from 4 week-old ADicerKO mice (Extended Data Figure 3c) demonstrated that of the 380 profiled miRNAs, 373 miRNAs were detectable, of which 43% (or 202 miRNAs) were down-regulated in ADicerKO mice and only 4% (23 miRNAs) were up-regulated when compared to Lox littermate controls.   
+```{r}
+#to find out how many are significantly up or down regulated at p<0.05
+#filtering was applied using Ct<34 atleast twice
+x <- nrow(wk4.tt); if (x==380) cat(":-)") else cat(x)
+x <- nrow(wk4.ndct.filt); if (x==373) cat(":-)") else cat(x)
+
+x <- table(sign(wk4.tt$YDvsWT.logFC[wk4.tt$YDvsWT.p<0.05]))
+if (x["-1"]==202 & x["1"]==23) cat(":-)") else cat(x)
+```
+
+##Adipose Tissue Transplantation Reconstitutes Circulating miRNAs in Lipodystrophic Mice
+```{r read_mmu_depot, echo=FALSE}
+#######################################################################################################################
+##depot
+#######################################################################################################################
+##normalize with global mean, but use expression of Ct above u6 for venn
+depot.ct1 <- read.csv("Ct_tables/FatDepotsRepeats_Ct1.csv", row.names=1)
+#SQ is ING in mouse
+colnames(depot.ct1) <- gsub("SQ", "ING", colnames(depot.ct1))
+depot.contr.v <- c(BATvsEPI="BAT-EPI", BATvsING="BAT-ING", EPIvsING="EPI-ING")
+depot.u6.lst1 <- analyze_thomou_qPCR(depot.ct1, norm.nm="Mouse U6 (for mir 2-381)", filt.thresh=34, contrasts.v=depot.contr.v)
+depot.ct2 <- read.csv("Ct_tables/FatDepotsRepeats_Ct2.csv", row.names=1)
+colnames(depot.ct2) <- gsub("SQ", "ING", colnames(depot.ct2))
+depot.u6.lst2 <- analyze_thomou_qPCR(depot.ct2, norm.nm="Mouse U6 (for miR 382-710)", filt.thresh=34, contrasts.v=depot.contr.v)
+depot.u6.ndct <- rbind(depot.u6.lst1$ndct, depot.u6.lst2$ndct)
+depot.pheno <- depot.u6.lst1$pheno
+
+mean.mat <- t(apply(depot.u6.ndct, 1, FUN=function(v){
+  tapply(v, INDEX=depot.pheno$grp, FUN=mean)
+}))
+```
+
+miRNA profiling of subcutaneous inguinal (Ing) WAT, intraabdominal epididymal (Epi) WAT, and interscapular BAT from the normal donor mice taken at the time of transplantation revealed distinct, depot-specific signatures consistent with previous studies (Figure 2b).  
+
+Using mean normalization from [Mestdagh et al, 2009](https://genomebiology.biomedcentral.com/articles/10.1186/gb-2009-10-6-r64).  
+```{r 2bl_meannorm}
+depot.heat.lst1 <- analyze_thomou_qPCR(depot.ct1, norm.nm="globalmean", filt.thresh=34, contrasts.v=depot.contr.v)
+depot.heat.lst2 <- analyze_thomou_qPCR(depot.ct2, norm.nm="globalmean", filt.thresh=34, contrasts.v=depot.contr.v)
+
+depot.heat.ndct.filt <- rbind(depot.heat.lst1$ndct.filt, depot.heat.lst2$ndct.filt)
+heatmap(t(depot.heat.ndct.filt), col=greenred(50), scale="column", Rowv=NA, Colv=NA)
+depot.heat.ndct.filt.sc <- scale(x=t(depot.heat.ndct.filt))
+write.csv(t(depot.heat.ndct.filt.sc), "heatmap_z-scores/depot_heat_ndct_filt_z.csv")
+```
+
+Venn of mirs over u6 (fig 2b), independent of global avg.  
+```{r 2br}
+vennDiagram(vennCounts(mean.mat>0), circle.col = c("blue", "red", "yellow"))
+```
+
+Considering only the miRNAs that were expressed in at least one fat depot, 126 were highly expressed in BAT, 106 in Ing-WAT, and 160 in Epi-WAT, with 82 of these miRNAs expressed in all three depots (Figures 2b, Extended Data 4a; Supplemental Table 6).
+```{r}
+if (all(colSums(mean.mat>0)==c(126, 160, 106) & colnames(mean.mat)==c("BAT", "EPI", "ING"))) cat(":-)") else colSums(mean.mat>0)
+
+#use globalmean norm for stats
+depot.tt <- rbind(depot.heat.lst1$toptab, depot.heat.lst2$toptab)
+st6 <- depot.tt[,-grep("\\.avg", colnames(depot.tt))]
+write.csv(st6, "Supplemental_tables/ST6_Depot-stats.csv")
+```
+
+with 82 of these miRNAs expressed in all three depots.
+```{r}
+x <- sum(rowSums(mean.mat>0)==3)
+if (x==82) cat(":-)") else cat (x)
+```  
+
+PCA S2a  
+```{r s2a}
+depot.heat.ndct <- rbind(depot.heat.lst1$ndct, depot.heat.lst2$ndct)
+# s2a <- multi.pca(depot.heat.ndct, depot.pheno, color='grp', shape='grp', name="mouse_depots_repeat/meannorm_pca", all.size=3, rm.leg.title=TRUE)
+s2a <- multi.pca(depot.heat.ndct, depot.pheno, color='grp', shape='grp', name=NA, all.size=3, rm.leg.title=TRUE)
+```  
+
+###Transplant (not depot) data
+```{r read_transplant}
+#######################################################################################################################
+##transplant
+#######################################################################################################################
+trans.ct <- read.csv("Ct_tables/transplant-exo-Ct.csv", row.names=1)
+colnames(trans.ct) <- gsub("SQ", "ING", colnames(trans.ct))
+trans.grp <- gsub('[0-9]$', '', colnames(trans.ct))
+#ron only wants to analyze those where mean(WT)<34 
+wt.expr <- rowMeans(trans.ct[,trans.grp=="WT"])<34
+trans.ct.ss <- trans.ct[wt.expr,]
+
+#answer TT's question, and subtract one mir for u6
+cat("TT question: we keep", sum(wt.expr)-1, "mirs that have enough WT expression.\n")
+
+trans.lst <- analyze_thomou_qPCR(trans.ct.ss, filt.thresh=NA, contrasts.v = c(SALvsWT="SAL-WT", BATvsSAL="BAT-SAL", EPIvsSAL="EPI-SAL", INGvsSAL="ING-SAL"))
+trans.toptab <- trans.lst$toptab
+trans.ndct <- trans.lst$ndct
+trans.pheno <- trans.lst$pheno
+#ron then wants to see which went down in SAL (p<0.05)
+trans.toptab.ss <- trans.toptab[trans.toptab$SALvsWT.p<0.05 & trans.toptab$SALvsWT.logFC<0,]
+
+#finally ron wants to see whose expr went up >50% of the way to WT (i'll do on log scale)
+rescue.col.nms <- c("BAT", "EPI", "ING")
+#TT used linear scale, but I think that only worked b/c most mirs in depot were *>* WT
+trans.toptab.ss$half.avg <- (trans.toptab.ss$WT.avg+trans.toptab.ss$SAL.avg)/2
+rescue.half <- apply(trans.toptab.ss[,paste0(rescue.col.nms, ".avg")], MARGIN=2, 
+                    FUN=function(v){ v > trans.toptab.ss$half.avg })
+#as with previous mouse analysis, also check that Ct of depot <34
+ct.means <- t(apply(trans.ct, 1, FUN=function(v) tapply(v, trans.grp, mean, na.rm=TRUE)))
+rescue.ct <- ct.means[rownames(trans.toptab.ss), rescue.col.nms]<34
+
+#also check that DepotvsSAL.p<0.05
+p.tab <- trans.toptab.ss[,paste0(rescue.col.nms, "vsSAL.p")]
+rescue.p <- p.tab<0.05
+
+#combine 3 matrices logically
+rescue.mat <- rescue.p & rescue.ct & rescue.half
+colnames(rescue.mat) <- rescue.col.nms
+```
+
+As in the first cohort, in the sham operated ADicerKO mice circulating exosomal miRNAs were markedly reduced compared to controls (Figure 2c). By comparison, ADicerKO mice that received BAT and Ing-WAT transplants showed remarkable restoration of circulating exosomal miRNAs, with lower restoration in mice receiving Epi-WAT (Figures 2c and Extended Data Figure 5a; Supplemental Tables 7 and 8).  
+```{r 2c}
+##trans.ndct has all mirs where mean(WT)<34
+heatmap(t(trans.ndct), col=greenred(50), scale="column", Rowv=NA, Colv=NA)
+# my.heat(trans.ndct, name=NA, Colv=FALSE, labRow=NA, clip=10, margins=c(5,5), dendro="none")
+
+# rescue.mat <- read.csv("mouse_transplants/transplant_rescue_matrix.csv", row.names=1)
+vennDiagram(vennCounts(rescue.mat), circle.col = c("blue", "red", "yellow"))
+
+st7 <- rescue.mat[rowSums(rescue.mat) > 0,] #only keep rows with a rescue
+write.csv(st7, "Supplemental_tables/ST7_MouseDepotRescue.csv")
+
+st8 <- trans.toptab.ss[,-grep("\\.avg", colnames(trans.toptab.ss))]
+write.csv(st8, "Supplemental_tables/ST8_TransplantComparisons.csv")
+```  
+
+PCA S5a  
+```{r s5a}
+pca <- multi.pca(trans.ndct, trans.pheno, color='grp', shape='grp', name=NA, all.size=3, rm.leg.title=TRUE)
+```  
+
+Indeed, of the circulating exosomal miRNAs profiled, 375 revealed detectable levels of expression (Ct<34), and most of which were significantly decreased in ADicerKO serum, fat transplantation restored the levels of 150, 110, and 116 at least 50% of the way to normal in mice receiving BAT, Epi-WAT and Ing-WAT transplants, respectively.
+```{r rescue}
+mir.wt <- setdiff(rownames(trans.ct)[rowMeans(trans.ct[,trans.grp=="WT"])<34], "Mouse U6 snRNA")
+x <- sum(trans.toptab[mir.wt, "SALvsWT.logFC"]<0 & trans.toptab[mir.wt, "SALvsWT.p"]<0.05)
+if (x==177) cat(":-)") else cat(x)
+
+if (all(colSums(rescue.mat)==c(150, 110, 116) & colnames(rescue.mat)==c("BAT", "EPI", "ING"))){
+  cat(":-)")
+} else { colSums(rescue.mat) }
+```
+
+Four miRNA candidates were identified (miR-99a, miR-99b, miR-100, and miR-466i), and three of these (miR-99a, -99b, and -100) were decreased by 75-80% in the serum of ADicerKO mice compared to controls. 
+```{r fgf21}
+##fgf21
+mirs.tmp <- paste0("mmu-", c("miR-99a", "miR-99b", "miR-100", "miR-466i"))
+trans.toptab[mirs.tmp,]
+rescue.mat[intersect(mirs.tmp, rownames(rescue.mat)),]
+```
+
+
+##Session Info  
+```{r session}
+sessionInfo()
+```
