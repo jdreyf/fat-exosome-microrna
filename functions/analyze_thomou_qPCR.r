@@ -9,14 +9,14 @@ analyze_thomou_qPCR <- function(ct, filt.thresh=34, norm.nm="Mouse U6 snRNA", co
   grp <- setNames(gsub('(\\.|)[0-9]$', '', colnames(ct)), colnames(ct))
   pheno <- data.frame(sample=names(grp), grp=grp)
   rownames(pheno) <- names(grp)
-  #get min n per group for filtering
-  min.n.per.grp <- min(table(as.factor(grp)))
   
   ##filter
   #want 50% of smallest group size present
   #can't use group info, as per bourgon, gentleman & huber (pmid:20460310)
   if (!is.na(filt.thresh)){
-    mirs.keep <- rownames(ct)[rowSums(ct<=filt.thresh)>0.5*min.n.per.grp]
+    #get min n per group for filtering
+    min.n.per.grp <- min(table(as.factor(grp)))
+    mirs.keep <- rownames(ct)[rowSums(ct<=filt.thresh) > 0.5*min.n.per.grp]
     #but don't cut out normalization probe
     ct.filt <- ct[mirs.keep,]
   }
@@ -24,7 +24,13 @@ analyze_thomou_qPCR <- function(ct, filt.thresh=34, norm.nm="Mouse U6 snRNA", co
   ##tell number of microRNAs not counting u6
   if (!quiet){
     cat("There were", nrow(ct)-1, "miRNAs profiled")
-    if (!is.na(filt.thresh)) cat(" of which", nrow(ct.filt)-1, "were detected.\n") else ("\n")
+    if (!is.na(filt.thresh)){
+      cat(" of which", nrow(ct.filt)-1, "were detected.\n")
+      #min number of times a mir must be detectable
+      cat("Min n detectable:", floor(0.5*min.n.per.grp)+1, "\n")
+    } else {
+      cat("\n") 
+    }
   }
   
   ##norm
@@ -46,10 +52,10 @@ analyze_thomou_qPCR <- function(ct, filt.thresh=34, norm.nm="Mouse U6 snRNA", co
   ##stats
   if (!is.na(contrasts.v)[1]){
     toptab <- limma.contrasts(ndct, grp, contrasts.v = contrasts.v)
+    if (!is.na(filt.thresh)){ toptab.filt <- limma.contrasts(ndct.filt, grp, contrasts.v = contrasts.v) } else { toptab.filt <- toptab  }
   } else {
     toptab <- NULL
   }
   
-  
-  return(list(pheno=pheno, ndct=ndct, ndct.filt=ndct.filt, toptab=toptab))
+  return(list(pheno=pheno, ndct=ndct, ndct.filt=ndct.filt, toptab=toptab, toptab.filt=toptab.filt))
 }
